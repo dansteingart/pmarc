@@ -4,16 +4,40 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="/static/pretty-print-json.min.js"></script>
     <link href="/static/pretty-print-json.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     
 </head>
 <body>
 
     <div id="data"></div>
+    <canvas id="myChart"></canvas>
 
 <script>
       var socket = io();
       socket.on('data', function(msg){$("#data").html(prettyPrintJson.toHtml(msg))})
+
+      const ctx = document.getElementById('myChart');
+
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
+    datasets: [{
+      label: '# of Votes',
+      data: [12, 19, 3, 5, 2, 3],
+      borderWidth: 1
+    }]
+  },
+  options: {
+    scales: {
+      y: {
+        beginAtZero: true
+      }
+    }
+  }
+});
+
 
 </script>
 </body>

@@ -17,7 +17,9 @@ app.use(bodyParser.json())
 
 settings = JSON.parse(fs.readFileSync("settings.json"))
 heater = settings['heater'];
+thermistors = settings['thermistors']
 socketh = ioc(`ws://localhost:${heater}`)
+sockett = ioc(`ws://localhost:${thermistors}`)
 
 //globals
 console.log(settings)
@@ -39,7 +41,26 @@ socketh.on("data",(data)=>{
         sdata['fresh'] = true;
     }
 })
-setinterval(1);
+
+buff = ""
+
+
+sockett.on("data",(data)=>{
+    buff += data;
+    if (buff.search("\n") > -1)
+    {
+        out = {}
+        try { 
+            Ts = JSON.parse(buff);
+            sdata['T0'] = Ts['T0'];
+            sdata['T1'] = Ts['T1'];
+        }
+
+        catch(e) {a = 3}
+        buff = "";
+    }
+    
+});
 
 function saver(savestate){ save = savestate; sdata['save'] = savestate; return {'savestatus':savestate}}
 function settemp(s){socketh.emit("input",`M104 S${s}`)}
