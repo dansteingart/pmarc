@@ -36,7 +36,6 @@ socketh.on("data",(data)=>{
     {
         sdata['T_act'] = parseFloat(hparts[0]);
         sdata['T_set'] = parseFloat(hparts[1]);
-        console.log(sdata);
     }
 })
 
@@ -69,6 +68,7 @@ client.on('connect',()=>
             if (publish & sdata['T_act'] != undefined) 
             {
                 client.publish(client.publish(`${topic}/${unit}/${experiment}/table`, JSON.stringify(sdata)));
+                io.emit('data',sdata)
                 sdata['T_act'] = undefined;
             }
         }, 1000)
