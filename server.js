@@ -22,7 +22,7 @@ socketh = ioc(`ws://localhost:${heater}`)
 //globals
 console.log(settings)
 var topic = settings['basetopic'];
-var publish = false;
+var save = false;
 var unit = settings["unit"];
 var sdata = {}
 
@@ -39,12 +39,15 @@ socketh.on("data",(data)=>{
         sdata['fresh'] = true;
     }
 })
+setinterval(1);
 
-
-
+function saver(savestate){ save = savestate; sdata['save'] = savestate; return {'savestatus':savestate}}
+function settemp(s){socketh.emit("input",`M104 S${s}`)}
+function setinterval(s){socketh.emit("input",`M155 S${s}`)}
 //express hooks
-app.get('/start', function(req,res){ publish = true; res.send(JSON.stringify({'status':'start'}))});
-app.get('/stop',  function(req,res){ publish = false;res.send(JSON.stringify({'status':'stop'}))});
+app.get('/save/on', function(req,res){res.send(JSON.stringify(saver(true)))});
+app.get('/save/off',function(req,res){res.send(JSON.stringify(saver(false)))});
+
 app.get('/experiment/*',function(req,res){ 
     experiment = req.originalUrl.replace("/experiment/","")
 	experiment = decodeURIComponent(experiment);
@@ -54,14 +57,14 @@ app.get('/experiment/*',function(req,res){
 app.get('/setpoint/*',function(req,res){ 
     setpoint = req.originalUrl.replace("/setpoint/","")
 	setpoint = decodeURIComponent(setpoint);
-    socketh.emit("input",`M104 S${setpoint}`)
+    settemp(setpoint)
     res.send(JSON.stringify({'status':'changed setpoint','setpoint':parseFloat(setpoint)}));
 });
 
 app.get('/interval/*',function(req,res){ 
     interval = req.originalUrl.replace("/interval/","")
 	interval = decodeURIComponent(interval);
-    socketh.emit("input",`M155 S${interval}`)
+    setinterval(interval);
     res.send(JSON.stringify({'status':'changed setpoint','setpoint':parseFloat(interval)}));
 });
 
@@ -73,21 +76,40 @@ app.get('/tina/*',function(req,res){
     res.send(JSON.stringify({'status':'issued tina command','command':tina}));
 });
 
-app.get('/*',function(req,res){	res.send(JSON.stringify(sdata))});
+app.get('/state',function(req,res){	res.send(JSON.stringify(sdata))});
+app.get('/',function(req,res){	res.sendFile(__dirname+"/index.html")});
 
 server.listen(settings['port']);
 
-//mqtt out
+//mqtt stuff
 const client  = mqtt.connect(`mqtt://${settings['mqtt']}`)
 client.on('connect',()=>
     {
+        client.subscribe(`${unit}/cmd`,()=>{});
+
         setInterval(()=>{
-            if (publish & sdata['fresh']) 
+            if (sdata['fresh'])
             {
-                client.publish(client.publish(`${topic}/${unit}/${experiment}/table`, JSON.stringify(sdata)));
                 io.emit('data',sdata)
+                client.publish(`${unit}/update`, JSON.stringify(sdata));
+                if (save) client.publish(`${topic}/${unit}/${experiment}/table`, JSON.stringify(sdata));
                 sdata['fresh'] = false;
             }
         }, 1000)
     }
 )
+
+client.on('message', 
+    function (topic, message) {
+        try {
+            msg = JSON.parse(message.toString())
+
+            if ("setpoint" in msg) settemp(msg['setpoint']);
+            if ("save" in msg) saver(msg['save']);
+            if ("experiment" in msg) experiment = msg['experiment'];
+
+            client.publish(`${unit}/confirm`,message.toString());
+                
+        }
+        catch (e){console.log(e)}
+    })

@@ -1,0 +1,21 @@
+<html>
+<head>
+    <script src="/static/jquery.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/static/pretty-print-json.min.js"></script>
+    <link href="/static/pretty-print-json.css" rel="stylesheet">
+
+    
+</head>
+<body>
+
+    <div id="data"></div>
+
+<script>
+      var socket = io();
+      socket.on('data', function(msg){$("#data").html(prettyPrintJson.toHtml(msg))})
+
+</script>
+</body>
+
+</html>
