@@ -36,6 +36,7 @@ socketh.on("data",(data)=>{
     {
         sdata['T_act'] = parseFloat(hparts[0]);
         sdata['T_set'] = parseFloat(hparts[1]);
+        sdata['fresh'] = true;
     }
 })
 
@@ -49,14 +50,30 @@ app.get('/experiment/*',function(req,res){
 	experiment = decodeURIComponent(experiment);
     res.send(JSON.stringify({'status':'changed experiment name','experiment':experiment}));
 });
-app.get('/heater/*',function(req,res){ 
-    heater = req.originalUrl.replace("/heater/","")
-	heater = decodeURIComponent(heater);
-    socketh.emit("input",heater)
-    res.send(JSON.stringify({'status':'issued heater command','command':heater}));
+
+app.get('/setpoint/*',function(req,res){ 
+    setpoint = req.originalUrl.replace("/setpoint/","")
+	setpoint = decodeURIComponent(setpoint);
+    socketh.emit("input",`M104 S${setpoint}`)
+    res.send(JSON.stringify({'status':'changed setpoint','setpoint':parseFloat(setpoint)}));
 });
 
-app.get('/*',function(req,res){	 res.send("Hello World") });
+app.get('/interval/*',function(req,res){ 
+    interval = req.originalUrl.replace("/interval/","")
+	interval = decodeURIComponent(interval);
+    socketh.emit("input",`M155 S${interval}`)
+    res.send(JSON.stringify({'status':'changed setpoint','setpoint':parseFloat(interval)}));
+});
+
+
+app.get('/tina/*',function(req,res){ 
+    tina = req.originalUrl.replace("/tina/","")
+	tina = decodeURIComponent(tina);
+    socketh.emit("input",tina)
+    res.send(JSON.stringify({'status':'issued tina command','command':tina}));
+});
+
+app.get('/*',function(req,res){	res.send(JSON.stringify(sdata))});
 
 server.listen(settings['port']);
 
@@ -65,11 +82,11 @@ const client  = mqtt.connect(`mqtt://${settings['mqtt']}`)
 client.on('connect',()=>
     {
         setInterval(()=>{
-            if (publish & sdata['T_act'] != undefined) 
+            if (publish & sdata['fresh']) 
             {
                 client.publish(client.publish(`${topic}/${unit}/${experiment}/table`, JSON.stringify(sdata)));
                 io.emit('data',sdata)
-                sdata['T_act'] = undefined;
+                sdata['fresh'] = false;
             }
         }, 1000)
     }
