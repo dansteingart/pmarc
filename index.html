@@ -4,39 +4,68 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="/static/pretty-print-json.min.js"></script>
     <link href="/static/pretty-print-json.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/plotly.min.js"></script>
 
     
 </head>
 <body>
 
     <div id="data"></div>
-    <canvas id="myChart"></canvas>
-
+    <div id="tester" style="width:100%;height:90%;"></div>
 <script>
       var socket = io();
-      socket.on('data', function(msg){$("#data").html(prettyPrintJson.toHtml(msg))})
 
-      const ctx = document.getElementById('myChart');
+    
+  var layout = {
+            title: {
+              text:'pmarc_01',
+              font: {
+                family: 'Courier New, monospace',
+                size: 24
+              },
+              xref: 'paper',
+              x: 0.05,
+            },
+            xaxis: {
+              title: {
+                text: '',
+                font: {
+                  family: 'Courier New, monospace',
+                  size: 18,
+                  color: '#7f7f7f'
+                }
+              },
+            },
+            yaxis: {
+              title: {
+                text: 'Temperature (˚C)',
+                font: {
+                  family: 'Courier New, monospace',
+                  size: 18,
+                  color: '#7f7f7f'
+                }
+              }
+            }          };
 
-new Chart(ctx, {
-  type: 'bar',
-  data: {
-    labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
-    datasets: [{
-      label: '# of Votes',
-      data: [12, 19, 3, 5, 2, 3],
-      borderWidth: 1
-    }]
-  },
-  options: {
-    scales: {
-      y: {
-        beginAtZero: true
-      }
-    }
-  }
-});
+          var config = {responsive: true}
+
+          TESTER = document.getElementById('tester');
+            Plotly.newPlot( TESTER, [
+              {x: [],y:[],name:'Set'},
+              {x:[],y:[],name:'Actual'},
+              {x:[],y:[],name:'T0'}], layout,config );
+
+
+      socket.on('data', function(msg){
+        $("#data").html(prettyPrintJson.toHtml(msg))
+        var time = new Date();
+        update = {x:[[time],[time],[time]],
+                  y:[[msg['T_set']],[msg['T_act']],[msg['T0']]] }
+                
+        Plotly.extendTraces('tester', update, [0,1,2])
+
+      
+      })
 
 
 </script>
