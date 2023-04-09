@@ -52,6 +52,8 @@ sockett.on("data",(data)=>{
         out = {}
         try { 
             Ts = JSON.parse(buff);
+            sdata['a0'] = Ts['a0'];
+            sdata['a1'] = Ts['a1'];
             sdata['T0'] = Ts['T0'];
             sdata['T1'] = Ts['T1'];
         }
