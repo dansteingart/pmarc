@@ -18,6 +18,7 @@ app.use(bodyParser.json())
 settings = JSON.parse(fs.readFileSync("settings.json"))
 heater = settings['heater'];
 thermistors = settings['thermistors']
+unit = settings['unit']
 socketh = ioc(`ws://localhost:${heater}`)
 sockett = ioc(`ws://localhost:${thermistors}`)
 
@@ -26,6 +27,7 @@ console.log(settings)
 var topic = settings['basetopic'];
 var save = false;
 var unit = settings["unit"];
+var experiment = "";
 var sdata = {}
 
 //data gets
@@ -64,19 +66,25 @@ sockett.on("data",(data)=>{
     
 });
 
+
+//Helper functions
 function saver(savestate){ save = savestate; sdata['save'] = savestate; return {'savestatus':savestate}}
 function settemp(s){socketh.emit("input",`M104 S${s}`)}
 function setinterval(s){socketh.emit("input",`M155 S${s}`)}
-//express hooks
+function sendgcode(ss){socketh.emit("input",ss)}
+
+//Save to steingart_lab/data on/off
 app.get('/save/on', function(req,res){res.send(JSON.stringify(saver(true)))});
 app.get('/save/off',function(req,res){res.send(JSON.stringify(saver(false)))});
 
+//Change Experiment Name
 app.get('/experiment/*',function(req,res){ 
     experiment = req.originalUrl.replace("/experiment/","")
 	experiment = decodeURIComponent(experiment);
     res.send(JSON.stringify({'status':'changed experiment name','experiment':experiment}));
 });
 
+//Change hotend setpoint
 app.get('/setpoint/*',function(req,res){ 
     setpoint = req.originalUrl.replace("/setpoint/","")
 	setpoint = decodeURIComponent(setpoint);
@@ -84,6 +92,7 @@ app.get('/setpoint/*',function(req,res){
     res.send(JSON.stringify({'status':'changed setpoint','setpoint':parseFloat(setpoint)}));
 });
 
+//Set Temperature Report Interval
 app.get('/interval/*',function(req,res){ 
     interval = req.originalUrl.replace("/interval/","")
 	interval = decodeURIComponent(interval);
@@ -92,20 +101,30 @@ app.get('/interval/*',function(req,res){
 });
 
 
-app.get('/tina/*',function(req,res){ 
-    tina = req.originalUrl.replace("/tina/","")
-	tina = decodeURIComponent(tina);
-    socketh.emit("input",tina)
-    res.send(JSON.stringify({'status':'issued tina command','command':tina}));
+//Send Whatever Gcode to Marlin
+app.get('/gcode/*',function(req,res){ 
+    gcode = req.originalUrl.replace("/gcode/","")
+	gcode = decodeURIComponent(gcode);
+    sendgcode(gcode)
+    res.send(JSON.stringify({'status':'issued gcode command','command':gcode}));
 });
 
-app.get('/state',function(req,res){	res.send(JSON.stringify(sdata))});
+//Homepage
 app.get('/',function(req,res){	res.sendFile(__dirname+"/index.html")});
 
+//Return the current measurement
+app.get('/state',function(req,res){	res.send(JSON.stringify(sdata))});
+
+//Return the unit/experiment name
+app.get('/meta',function(req,res){res.send(JSON.stringify({'unit':unit,'experiment':experiment}))});
+
+//server on!
 server.listen(settings['port']);
 
 //mqtt stuff
 const client  = mqtt.connect(`mqtt://${settings['mqtt']}`)
+
+//start sending state on connect
 client.on('connect',()=>
     {
         client.subscribe(`${unit}/cmd`,()=>{});
@@ -122,6 +141,7 @@ client.on('connect',()=>
     }
 )
 
+//act on messages
 client.on('message', 
     function (topic, message) {
         try {
@@ -130,6 +150,7 @@ client.on('message',
             if ("setpoint" in msg) settemp(msg['setpoint']);
             if ("save" in msg) saver(msg['save']);
             if ("experiment" in msg) experiment = msg['experiment'];
+            if ("gcode" in msg) sendgcode(msg['gcode']);
 
             client.publish(`${unit}/confirm`,message.toString());
                 

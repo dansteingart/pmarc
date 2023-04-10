@@ -1,4 +1,10 @@
 <html>
+  <style>
+    body{font-family:'Courier New', Courier, monospace;}
+    h1 {color:gray}
+    input {font-family:'Courier New', Courier, monospace; border: none; border-bottom: .5px solid black; outline:none; width: 50px; text-align:center;}
+    button {font-family:'Courier New', Courier, monospace;}
+  </style>
 <head>
     <script src="/static/jquery.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
@@ -9,45 +15,25 @@
     
 </head>
 <body>
-
+    <h1 id="ptitle"></h1>
     <div id="data"></div>
     <div id="tester" style="width:100%;height:90%;"></div>
-    <div id="controls"><input id="setbox" value="0"><button id="setbut">set</button></div>
+    <div id="controls"><button id="setbut">set</button> <input id="setbox" value="0"></div>
 <script>
       var socket = io();
 
+
+      $.get("/meta",(msg)=>{msg = JSON.parse(msg); $("#ptitle").html(msg['unit'])})
       $("#setbut").click(()=>{$.get(`/setpoint/${$("#setbox").val()}`)})
     
   var layout = {
-            title: {
-              text:'pmarc_01',
-              font: {
-                family: 'Courier New, monospace',
-                size: 24
-              },
-              xref: 'paper',
-              x: 0.05,
-            },
-            xaxis: {
-              title: {
-                text: '',
-                font: {
-                  family: 'Courier New, monospace',
-                  size: 18,
-                  color: '#7f7f7f'
-                }
-              },
-            },
+            xaxis: {tickfont:{family:'Courier New, monospace'}},
             yaxis: {
-              title: {
-                text: 'Temperature (˚C)',
-                font: {
-                  family: 'Courier New, monospace',
-                  size: 18,
-                  color: '#7f7f7f'
-                }
-              }
-            }          };
+              title: {text: 'Temperature (˚C)', font: { family: 'Courier New, monospace', size: 18, color: '#7f7f7f'}},
+              tickfont:{family:'Courier New, monospace'} 
+            },    
+          legend:{font:{family:'Courier New, monospace'}}
+          };
 
           var config = {responsive: true}
 
@@ -59,7 +45,8 @@
 
 
       socket.on('data', function(msg){
-        $("#data").html(prettyPrintJson.toHtml(msg))
+        opt = {trailingComma:false}
+        $("#data").html(prettyPrintJson.toHtml(msg,opt))
         var time = new Date();
         update = {x:[[time],[time],[time]],
                   y:[[msg['T_set']],[msg['T_act']],[msg['T0']]] }
