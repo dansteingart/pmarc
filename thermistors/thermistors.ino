@@ -2,8 +2,12 @@
 #include <ArduinoJson.hpp>
 #include <math.h>
 #include "circuit.h"
+#include <SPI.h>
+#include "Adafruit_MAX31855.h"
 
 StaticJsonDocument<1000> out;
+Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
+
 int last;
 
 void setup()
@@ -11,6 +15,11 @@ void setup()
     Serial.begin(115200);
     last = micros();
   analogReadResolution(14); //set read to 14 bits
+  if (!thermocouple.begin()) {
+      Serial.println("ERROR.");
+      while (1) delay(10);
+  }
+  Serial.println("DONE.");
 
 }
 
@@ -42,6 +51,7 @@ void loop()
   int last_marker = 0;
   if (( micros() - last) > sample_period)
   {
+
     last_marker = micros() - last; //mark time since last send started
     last = micros();
 
@@ -49,6 +59,17 @@ void loop()
     a1 = a1 / samps; //average readings
     a2 = a2 / samps; //average readings
     a3 = a3 / samps; //average readings
+
+     double c = thermocouple.readCelsius();
+     if (isnan(c)) {
+     Serial.println("Thermocouple fault(s) detected!");
+     uint8_t e = thermocouple.readError();
+     if (e & MAX31855_FAULT_OPEN) out["tc_error"] = "no connection";
+     if (e & MAX31855_FAULT_SHORT_GND) out["tc_error"] = "short to gnd";
+     if (e & MAX31855_FAULT_SHORT_VCC) out["tc_error"] = "short to VCC";
+   } else {
+     out["TC"] = c; 
+   }
 
     out["a0"] = a0;
     out["a1"] = a1;
