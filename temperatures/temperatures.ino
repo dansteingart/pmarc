@@ -3,10 +3,10 @@
 #include <math.h>
 #include "circuit.h"
 #include <SPI.h>
-#include "Adafruit_MAX31855.h"
+#include "max6675.h"
 
 StaticJsonDocument<1000> out;
-Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
+MAX6675 thermocouple(mCLK, mCS, mDO);
 
 int last;
 
@@ -15,11 +15,6 @@ void setup()
     Serial.begin(115200);
     last = micros();
   analogReadResolution(14); //set read to 14 bits
-  if (!thermocouple.begin()) {
-      Serial.println("ERROR.");
-      while (1) delay(10);
-  }
-  Serial.println("DONE.");
 
 }
 
@@ -61,22 +56,14 @@ void loop()
     a3 = a3 / samps; //average readings
 
      double c = thermocouple.readCelsius();
-     if (isnan(c)) {
-     Serial.println("Thermocouple fault(s) detected!");
-     uint8_t e = thermocouple.readError();
-     if (e & MAX31855_FAULT_OPEN) out["tc_error"] = "no connection";
-     if (e & MAX31855_FAULT_SHORT_GND) out["tc_error"] = "short to gnd";
-     if (e & MAX31855_FAULT_SHORT_VCC) out["tc_error"] = "short to VCC";
-   } else {
      out["TC"] = c; 
-   }
-
+ 
     out["a0"] = a0;
     out["a1"] = a1;
     out["T0"] = Tt(a0);
     out["T1"] = Tt(a1);
-    // out["T2"] = Tt(a2);
-    // out["T3"] = Tt(a3);
+    out["T2"] = Tt(a2);
+    out["T3"] = Tt(a3);
     out["ttp"] = micros() - last;
     out["samps"] = last_marker;
     serializeJson(out, Serial);

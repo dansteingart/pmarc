@@ -58,6 +58,9 @@ sockett.on("data",(data)=>{
             sdata['a1'] = Ts['a1'];
             sdata['T0'] = Ts['T0'];
             sdata['T1'] = Ts['T1'];
+            sdata['T2'] = Ts['T2'];
+            sdata['T3'] = Ts['T3'];
+            sdata['TC'] = Ts['TC'];
         }
 
         catch(e) {a = 3}
@@ -72,6 +75,10 @@ function saver(savestate){ save = savestate; sdata['save'] = savestate; return {
 function settemp(s){socketh.emit("input",`M104 S${s}`)}
 function setinterval(s){socketh.emit("input",`M155 S${s}`)}
 function sendgcode(ss){socketh.emit("input",ss)}
+
+
+//pithy hack
+app.get('/script',function(req,res){res.sendFile(__dirname+"/pindex.html")});
 
 //Save to steingart_lab/data on/off
 app.get('/save/on', function(req,res){res.send(JSON.stringify(saver(true)))});
@@ -97,7 +104,7 @@ app.get('/interval/*',function(req,res){
     interval = req.originalUrl.replace("/interval/","")
 	interval = decodeURIComponent(interval);
     setinterval(interval);
-    res.send(JSON.stringify({'status':'changed setpoint','setpoint':parseFloat(interval)}));
+    res.send(JSON.stringify({'status':'changed in','interval':parseFloat(interval)}));
 });
 
 
@@ -146,7 +153,7 @@ client.on('message',
     function (topic, message) {
         try {
             msg = JSON.parse(message.toString())
-
+            //console.log(msg)
             if ("setpoint" in msg) settemp(msg['setpoint']);
             if ("save" in msg) saver(msg['save']);
             if ("experiment" in msg) experiment = msg['experiment'];
