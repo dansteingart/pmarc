@@ -13,7 +13,7 @@ var layout = {
     };
 
     var config = {responsive: true}
-plist = "T_set,T_act,T0,T1,T2,TC";
+plist = "setpoint,T13,T14,T15,TC";
 probes = plist.split(",");
 function makestruct(ll)
 {

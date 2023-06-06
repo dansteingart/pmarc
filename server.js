@@ -16,12 +16,10 @@ app.use(bodyParser.urlencoded({extended:true})); //deprecated not sure what to d
 app.use(bodyParser.json())
 
 settings = JSON.parse(fs.readFileSync("settings.json"))
-heater = settings['heater'];
-thermistors = settings['thermistors']
+ramps = settings['ramps'];
 unit = settings['unit']
-socketh = ioc(`ws://localhost:${heater}`)
-sockett = ioc(`ws://localhost:${thermistors}`)
-
+socketr = ioc(`ws://localhost:${ramps}`)
+console.log(socketr.connected)
 //globals
 console.log(settings)
 var topic = settings['basetopic'];
@@ -33,48 +31,27 @@ var sdata = {}
 //data gets
 const regex = /[-+]?[0-9]*\.?[0-9]+/g;
 
-socketh.on("data",(data)=>{
-    hparts = data.match(regex);
-    if (hparts == null) hparts = []
-    if (hparts.length == 3)
-    {
-        sdata['T_act'] = parseFloat(hparts[0]);
-        sdata['T_set'] = parseFloat(hparts[1]);
-        sdata['fresh'] = true;
-    }
-})
-
 buff = ""
-
-
-sockett.on("data",(data)=>{
+socketr.on("data",(data)=>{
     buff += data;
     if (buff.search("\n") > -1)
     {
         out = {}
         try { 
             Ts = JSON.parse(buff);
-            sdata['a0'] = Ts['a0'];
-            sdata['a1'] = Ts['a1'];
-            sdata['T0'] = Ts['T0'];
-            sdata['T1'] = Ts['T1'];
-            sdata['T2'] = Ts['T2'];
-            sdata['T3'] = Ts['T3'];
-            sdata['TC'] = Ts['TC'];
+            for(var k in Ts) sdata[k]=Ts[k];
         }
-
         catch(e) {a = 3}
+        sdata['fresh'] = true;
         buff = "";
     }
-    
 });
 
 
 //Helper functions
 function saver(savestate){ save = savestate; sdata['save'] = savestate; return {'savestatus':savestate}}
-function settemp(s){socketh.emit("input",`M104 S${s}`)}
-function setinterval(s){socketh.emit("input",`M155 S${s}`)}
-function sendgcode(ss){socketh.emit("input",ss)}
+function settemp(s){socketr.emit("input",JSON.stringify({'setpoint':s}))};
+function sendramps(ss){socketr.emit("input",JSON.stringify(ss))}
 
 
 //pithy hack
@@ -108,14 +85,6 @@ app.get('/interval/*',function(req,res){
 });
 
 
-//Send Whatever Gcode to Marlin
-app.get('/gcode/*',function(req,res){ 
-    gcode = req.originalUrl.replace("/gcode/","")
-	gcode = decodeURIComponent(gcode);
-    sendgcode(gcode)
-    res.send(JSON.stringify({'status':'issued gcode command','command':gcode}));
-});
-
 //Homepage
 app.get('/',function(req,res){	res.sendFile(__dirname+"/index.html")});
 
@@ -137,6 +106,7 @@ client.on('connect',()=>
         client.subscribe(`${unit}/cmd`,()=>{});
 
         setInterval(()=>{
+
             if (sdata['fresh'])
             {
                 io.emit('data',sdata)
@@ -151,14 +121,14 @@ client.on('connect',()=>
 //act on messages
 client.on('message', 
     function (topic, message) {
+        
         try {
             msg = JSON.parse(message.toString())
-            //console.log(msg)
+            console.log(msg)
             if ("setpoint" in msg) settemp(msg['setpoint']);
             if ("save" in msg) saver(msg['save']);
             if ("experiment" in msg) experiment = msg['experiment'];
-            if ("gcode" in msg) sendgcode(msg['gcode']);
-
+            if ("settings" in msg) sendramps(msg['settings']);
             client.publish(`${unit}/confirm`,message.toString());
                 
         }
