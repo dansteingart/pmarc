@@ -41,9 +41,10 @@ void setup()
     
 
     Serial.begin(115200);
-    while (!Serial) {
-      delay(10);
-    }
+    while(!Serial){}
+
+    Serial.print("ADC resolution set to ");
+
     Serial.println("MCP9600 HW test");
 
     /* Initialise the driver with I2C_ADDRESS and the default I2C bus. */
