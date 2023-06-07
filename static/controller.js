@@ -1,6 +1,8 @@
 var socket = io();
 
-$.get("/meta",(msg)=>{msg = JSON.parse(msg); $("#ptitle").html(msg['unit'])})
+node = window.location.pathname.split("/")[1]
+
+$.get("/meta",(msg)=>{msg = JSON.parse(msg); $("#ptitle").html(node)})
 $("#setbut").click(()=>{$.get(`/setpoint/${$("#setbox").val()}`)})
 
 var layout = {
@@ -31,7 +33,7 @@ TESTER = document.getElementById('tester');
 Plotly.newPlot( TESTER, ss , layout,config );
 
 
-socket.on('data', function(msg){
+socket.on(`${node}_data`, function(msg){
   opt = {trailingComma:false}
   $("#data").html(prettyPrintJson.toHtml(msg,opt))
   var time = new Date();

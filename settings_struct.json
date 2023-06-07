@@ -1,8 +1,5 @@
 {
     "port": PORTHERE,
     "mqtt": "YOUR.SERVER",
-    "basetopic" : "base/topic",
-    "unit" : "pmarc_pi_XX",
-    "ramps" : PORTHERE
-
+    "basetopic" : "base/topic"
 }

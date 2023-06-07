@@ -6,7 +6,6 @@ var cors = require('cors')
 const server = require('http').createServer(app);
 var io = require('socket.io')(server,{cors:{methods: ["GET", "POST"]}});
 const mqtt = require('mqtt')
-var ioc = require('socket.io-client');
 
 //set up express
 app.use(cors())
@@ -16,83 +15,71 @@ app.use(bodyParser.urlencoded({extended:true})); //deprecated not sure what to d
 app.use(bodyParser.json())
 
 settings = JSON.parse(fs.readFileSync("settings.json"))
-ramps = settings['ramps'];
-unit = settings['unit']
-socketr = ioc(`ws://localhost:${ramps}`)
-console.log(socketr.connected)
 //globals
 console.log(settings)
 var topic = settings['basetopic'];
 var save = false;
-var unit = settings["unit"];
 var experiment = "";
-var sdata = {}
-
+var savestates = {}
+var experiments = {}
 //data gets
 const regex = /[-+]?[0-9]*\.?[0-9]+/g;
 
-buff = ""
-socketr.on("data",(data)=>{
-    buff += data;
-    if (buff.search("\n") > -1)
-    {
-        out = {}
-        try { 
-            Ts = JSON.parse(buff);
-            for(var k in Ts) sdata[k]=Ts[k];
-        }
-        catch(e) {a = 3}
-        sdata['fresh'] = true;
-        buff = "";
-    }
-});
-
-
 //Helper functions
-function saver(savestate){ save = savestate; sdata['save'] = savestate; return {'savestatus':savestate}}
-function settemp(s){socketr.emit("input",JSON.stringify({'setpoint':s}))};
-function sendramps(ss){socketr.emit("input",JSON.stringify(ss))}
-
+function saver(node,savestate){ savestates[node] = savestate; return {'savestatus':savestates}}
+function settemp(node,s){client.publish(`${node}/cmd`,JSON.stringify({'setpoint':s}))};
+function setpid(node,kp,ki,kd){client.publish(`${node}/cmd`,JSON.stringify({'setpid':'true','kp':kp,'ki':ki,'kd':kd}))};
 
 //pithy hack
-app.get('/script',function(req,res){res.sendFile(__dirname+"/pindex.html")});
+app.get('/*/script',function(req,res){res.sendFile(__dirname+"/pindex.html")});
 
 //Save to steingart_lab/data on/off
-app.get('/save/on', function(req,res){res.send(JSON.stringify(saver(true)))});
-app.get('/save/off',function(req,res){res.send(JSON.stringify(saver(false)))});
+app.get('/*/save/on', function(req,res){node = req.path.split("/")[1],res.send(saver(node,true))});
+app.get('/*/save/off',function(req,res){node = req.path.split("/")[1],res.send(saver(node,false))});
 
 //Change Experiment Name
-app.get('/experiment/*',function(req,res){ 
-    experiment = req.originalUrl.replace("/experiment/","")
-	experiment = decodeURIComponent(experiment);
-    res.send(JSON.stringify({'status':'changed experiment name','experiment':experiment}));
+app.get('/*/experiment/*',function(req,res){ 
+    parts = req.path.split("/");
+    node = parts[1];
+    experiment = parts[3];
+    experiment = decodeURIComponent(experiment);
+    experiments[node] = experiment;
+    res.send(JSON.stringify({'status':'changed experiment name','node':node,'experiment':experiment}));
+    console.log(experiments);
 });
 
 //Change hotend setpoint
-app.get('/setpoint/*',function(req,res){ 
-    setpoint = req.originalUrl.replace("/setpoint/","")
-	setpoint = decodeURIComponent(setpoint);
-    settemp(setpoint)
-    res.send(JSON.stringify({'status':'changed setpoint','setpoint':parseFloat(setpoint)}));
+app.get('/*/setpoint/*',function(req,res){ 
+    parts = req.path.split("/");
+    node = parts[1];
+    setpoint = parts[3];
+    setpoint = decodeURIComponent(setpoint);
+    setpoint = parseFloat(setpoint)
+    settemp(node,setpoint)
+    res.send(JSON.stringify({'status':'changed setpoint','setpoint':setpoint}));
 });
 
-//Set Temperature Report Interval
-app.get('/interval/*',function(req,res){ 
-    interval = req.originalUrl.replace("/interval/","")
-	interval = decodeURIComponent(interval);
-    setinterval(interval);
-    res.send(JSON.stringify({'status':'changed in','interval':parseFloat(interval)}));
+//change PID parameters
+app.get('/*/setpid/*',function(req,res){ 
+    parts = req.path.split("/");
+    node = parts[1];
+    kp = parseFloat(parts[3]);
+    ki = parseFloat(parts[4]);
+    kd = parseFloat(parts[5]);
+    setpid(node,kp,ki,kd)
+    res.send(JSON.stringify({'status':'changed pids','kp':kp,'ki':ki,'kd':kd}));
 });
 
-
-//Homepage
-app.get('/',function(req,res){	res.sendFile(__dirname+"/index.html")});
 
 //Return the current measurement
-app.get('/state',function(req,res){	res.send(JSON.stringify(sdata))});
+//app.get('/state',function(req,res){	res.send(JSON.stringify(s))});
 
-//Return the unit/experiment name
-app.get('/meta',function(req,res){res.send(JSON.stringify({'unit':unit,'experiment':experiment}))});
+//Return the experiment names
+app.get('*/meta',function(req,res){res.send(JSON.stringify({'experiment':experiments}))});
+
+//Homepage
+app.get('/*',function(req,res){	res.sendFile(__dirname+"/index.html")});
+
 
 //server on!
 server.listen(settings['port']);
@@ -103,34 +90,43 @@ const client  = mqtt.connect(`mqtt://${settings['mqtt']}`)
 //start sending state on connect
 client.on('connect',()=>
     {
-        client.subscribe(`${unit}/cmd`,()=>{});
-
-        setInterval(()=>{
-
-            if (sdata['fresh'])
-            {
-                io.emit('data',sdata)
-                client.publish(`${unit}/update`, JSON.stringify(sdata));
-                if (save) client.publish(`${topic}/${unit}/${experiment}/table`, JSON.stringify(sdata));
-                sdata['fresh'] = false;
-            }
-        }, 1000)
+        console.log("connecting yo")
+        client.subscribe(`pmarc_server/cmd`,()=>{});
+        client.subscribe(`+/update`,()=>{});
     }
 )
 
 //act on messages
 client.on('message', 
     function (topic, message) {
-        
-        try {
-            msg = JSON.parse(message.toString())
-            console.log(msg)
-            if ("setpoint" in msg) settemp(msg['setpoint']);
-            if ("save" in msg) saver(msg['save']);
-            if ("experiment" in msg) experiment = msg['experiment'];
-            if ("settings" in msg) sendramps(msg['settings']);
-            client.publish(`${unit}/confirm`,message.toString());
-                
+        //sort logic
+        if ((topic.search("update") > -1) & (topic.search("_pi") == -1))
+        {
+            try
+            {
+            node = topic.split("/")[0];
+            msg = JSON.parse(message.toString());
+            if (savestates[node]) client.publish(`${settings['basetopic']}/${node}/${experiments[node]}/table`,JSON.stringify(msg));            
+            if (experiments[node] != undefined) msg['experiment'] = experiments[node];
+            if (savestates[node] != undefined) msg['save'] = savestates[node];
+            io.emit(`${node}_data`,msg);
+            }
+            catch (e){console.log(e)}
         }
-        catch (e){console.log(e)}
+
+        if (topic.search("cmd") > -1)
+        {
+            try {
+                msg = JSON.parse(message.toString())
+                console.log(msg)
+                if ("setpoint" in msg) settemp(msg['setpoint']);
+                if ("save" in msg) saver(msg['save']);
+                if ("experiment" in msg) experiment = msg['experiment'];
+                if ("settings" in msg) sendramps(msg['settings']);
+                client.publish(`pmarcs/confirm`,message.toString());
+                    
+            }
+
+            catch (e){console.log(e)}
+            }
     })
