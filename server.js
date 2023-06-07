@@ -90,7 +90,6 @@ const client  = mqtt.connect(`mqtt://${settings['mqtt']}`)
 //start sending state on connect
 client.on('connect',()=>
     {
-        console.log("connecting yo")
         client.subscribe(`pmarc_server/cmd`,()=>{});
         client.subscribe(`+/update`,()=>{});
     }
@@ -118,7 +117,6 @@ client.on('message',
         {
             try {
                 msg = JSON.parse(message.toString())
-                console.log(msg)
                 if ("setpoint" in msg) settemp(msg['setpoint']);
                 if ("save" in msg) saver(msg['save']);
                 if ("experiment" in msg) experiment = msg['experiment'];
