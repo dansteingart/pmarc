@@ -39,11 +39,16 @@ socket.on(`${node}_data`, function(msg){
   var time = new Date();
 
   xs = []
-  for (i in probes){xs[xs.length] = [time]}
   ys = []
-  for (i in probes){ys[ys.length] = [msg[probes[i]]]}
   ps = []
-  for (i in probes){ps[ps.length] = parseInt(i)}
+  for (i in probes){
+    if (msg[probes[i]] > -20)
+    {
+      xs[xs.length] = [time]
+      ys[ys.length] = [msg[probes[i]]]
+      ps[ps.length] = parseInt(i)
+    }
+  }
   Plotly.extendTraces('tester', {x:xs,y:ys}, ps)
 
 
