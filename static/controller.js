@@ -42,7 +42,7 @@ socket.on(`${node}_data`, function(msg){
   ys = []
   ps = []
   for (i in probes){
-    if (msg[probes[i]] > -20)
+    if (parseFloat(msg[probes[i]]) > -20)
     {
       xs[xs.length] = [time]
       ys[ys.length] = [msg[probes[i]]]
