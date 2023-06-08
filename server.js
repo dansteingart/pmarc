@@ -29,6 +29,7 @@ const regex = /[-+]?[0-9]*\.?[0-9]+/g;
 function saver(node,savestate){ savestates[node] = savestate; return {'savestatus':savestates}}
 function settemp(node,s){client.publish(`${node}/cmd`,JSON.stringify({'setpoint':s}))};
 function setpid(node,kp,ki,kd){client.publish(`${node}/cmd`,JSON.stringify({'setpid':'true','kp':kp,'ki':ki,'kd':kd}))};
+function setter(node,obj){client.publish(`${node}/cmd`,JSON.stringify(obj))}
 
 //pithy hack
 app.get('/*/script',function(req,res){res.sendFile(__dirname+"/pindex.html")});
@@ -90,7 +91,7 @@ const client  = mqtt.connect(`mqtt://${settings['mqtt']}`)
 //start sending state on connect
 client.on('connect',()=>
     {
-        client.subscribe(`pmarc_server/cmd`,()=>{});
+        client.subscribe(`pmarc_server/+/cmd`,()=>{});
         client.subscribe(`+/update`,()=>{});
     }
 )
@@ -116,12 +117,13 @@ client.on('message',
         if (topic.search("cmd") > -1)
         {
             try {
+                node = topic.split("/")[1]
                 msg = JSON.parse(message.toString())
-                if ("setpoint" in msg) settemp(msg['setpoint']);
-                if ("save" in msg) saver(msg['save']);
-                if ("experiment" in msg) experiment = msg['experiment'];
-                if ("settings" in msg) sendramps(msg['settings']);
-                client.publish(`pmarcs/confirm`,message.toString());
+                if ("setpoint" in msg) settemp(node,msg['setpoint']);
+                if ("save" in msg) saver(node,msg['save']);
+                if ("experiment" in msg) experiments[node] = msg['experiment'];
+                if ("settings" in msg) setter(node,msg['settings']);
+                client.publish(`pmarc_server/confirm`,message.toString());
                     
             }
 
