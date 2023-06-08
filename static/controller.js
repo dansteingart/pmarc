@@ -3,7 +3,7 @@ var socket = io();
 node = window.location.pathname.split("/")[1]
 
 $.get("/meta",(msg)=>{msg = JSON.parse(msg); $("#ptitle").html(node)})
-$("#setbut").click(()=>{$.get(`/setpoint/${$("#setbox").val()}`)})
+$("#setbut").click(()=>{$.get(`/${node}/setpoint/${$("#setbox").val()}`)})
 
 var layout = {
       xaxis: {tickfont:{family:'Courier New, monospace'}},
